@@ -1,0 +1,30 @@
+# 가상 환경 · 캐시
+.venv/
+__pycache__/
+*.pyc
+.cache/
+
+# 데이터 · 결과 (저장소에 올리지 않음)
+data/*
+!data/README.md
+outputs/*
+!outputs/README.md
+submissions/*
+!submissions/README.md
+
+# 개인 키
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# research 아래에 받은 개인 연구용 데이터
+research/**/prices.parquet
+research/**/universe.csv
+research/**/stocks.csv
+research/**/index.csv
+research/**/manifest.json
+
+# research 결과 파일
+research/outputs/

@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Edit(./.env)",
+      "Edit(./kit/**)",
+      "Edit(./config/**)",
+      "Edit(./data/**)",
+      "Edit(./pyproject.toml)",
+      "Edit(./uv.lock)",
+      "Edit(./.python-version)",
+      "Edit(./AGENTS.md)",
+      "Edit(./CLAUDE.md)",
+      "Edit(./.claude/**)",
+      "Edit(./.github/**)",
+      "Edit(./race.html)"
+    ]
+  }
+}

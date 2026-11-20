@@ -1,0 +1,24 @@
+{
+  "data": {
+    "fingerprint": "35c15f2c",
+    "delisted": 1,
+    "cut_matches": true
+  },
+  "equal_weight": {
+    "final_equity": 12946385,
+    "trades": 236
+  },
+  "golden_cross": {
+    "final_equity": 13042525,
+    "trades": 559
+  },
+  "momentum": {
+    "final_equity": 11885022,
+    "trades": 578
+  },
+  "spec": {
+    "result_csv": "09819a1c",
+    "valid": true,
+    "replay_matches": true
+  }
+}
