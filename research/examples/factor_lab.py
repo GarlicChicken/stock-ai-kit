@@ -1,7 +1,7 @@
 """예시: 기본 신호를 한꺼번에 검증하고, 여러 개를 시험한 만큼 p값을 보정해 표로 보기
 
 필요한 키: 없음 (표준 데이터만)
-실행: uv run python research/examples/factor_lab.py --start 2016-01-01 --end 2024-12-31 --horizon 5
+실행: uv run python research/examples/factor_lab.py --start 2010-01-04 --end 2022-12-29 --horizon 5
 
 - 신호마다 IC(신호 순위와 앞으로 수익률 순위의 상관) · 5분위 롱숏 차이 · 해마다 부호를 본다.
 - 여러 신호를 한꺼번에 시험하면 그중 몇 개는 우연히 좋아 보인다. Benjamini-Hochberg로 보정한 값도 같이 본다.
@@ -19,8 +19,8 @@ from kit.config import load_config
 from kit.lab import factor_test, robustness, signals
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--start", default="2016-01-01")
-ap.add_argument("--end", default="2024-12-31")
+ap.add_argument("--start", default="2010-01-04")
+ap.add_argument("--end", default="2022-12-29")
 ap.add_argument("--horizon", type=int, default=5)
 args = ap.parse_args()
 

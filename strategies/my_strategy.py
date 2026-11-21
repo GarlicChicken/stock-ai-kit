@@ -12,7 +12,7 @@ from kit.helpers import equal_weight, returns, top
 
 NAME = "내 전략"
 DESCRIPTION = "최근 20거래일 수익률이 높은 5종목을 같은 비중으로 담습니다."
-REBALANCE = "weekly"  # daily(매일) · weekly(매주) · monthly(매달)
+REBALANCE = "weekly"  # daily(매일) · weekly(매주) · monthly(매달) · 2weeks(2주마다) · 3weeks · 10days(10거래일마다)
 
 
 def decide(market):

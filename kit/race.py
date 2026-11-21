@@ -14,6 +14,18 @@ from .paths import OUTPUTS
 from .report import benchmark_series, render_html
 
 
+def team_table(rows):
+    """팀별 성적: 팀원 수익률의 평균 (팀 이름이 있는 결과만)."""
+    df = pd.DataFrame([r for r in rows if r.get("팀")])
+    if df.empty:
+        return df
+    g = df.groupby("팀").agg(인원=("이름", "count"), 평균_수익률=("총수익률", "mean"), 팀원=("이름", lambda x: " · ".join(x)))
+    g = g.sort_values("평균_수익률", ascending=False).reset_index()
+    g["평균_수익률"] = g["평균_수익률"].round(6)
+    g.insert(0, "순위", range(1, len(g) + 1))
+    return g
+
+
 def find_csvs(folder):
     folder = Path(folder)
     return sorted(p for p in folder.glob("*.csv") if not p.name.startswith((".", "_")))
@@ -77,9 +89,9 @@ def run_race(folder, cfg, calendar, index_table, start=None, end=None):
         eq = eq.round()
         values = eq.astype("int64").tolist()
         table[sub["name"]] = values
-        series.append({"name": sub["name"], "label": sub["strategy"], "values": values})
+        series.append({"name": sub["name"], "label": sub["strategy"], "team": sub.get("team", ""), "values": values})
         first, final = initial, values[-1]
-        rows.append({"이름": sub["name"], "전략": sub["strategy"], "최종 평가금액": final,
+        rows.append({"이름": sub["name"], "팀": sub.get("team", ""), "전략": sub["strategy"], "최종 평가금액": final,
                      "총수익률": round(final / first - 1, 6), "최대 낙폭": round(float((eq / eq.cummax() - 1).min()), 6),
                      "파일": sub["path"].name})
         ok(f"{sub['name']} · {sub['strategy']} : {pct(final / first - 1)}")
@@ -88,8 +100,13 @@ def run_race(folder, cfg, calendar, index_table, start=None, end=None):
     rows.sort(key=lambda r: r["최종 평가금액"], reverse=True)
     for i, r in enumerate(rows, 1):
         r["순위"] = i
-    pd.DataFrame(rows)[["순위", "이름", "전략", "최종 평가금액", "총수익률", "최대 낙폭", "파일"]] \
+    pd.DataFrame(rows)[["순위", "이름", "팀", "전략", "최종 평가금액", "총수익률", "최대 낙폭", "파일"]] \
         .to_csv(out_root / "leaderboard.csv", index=False, encoding="utf-8-sig", lineterminator="\n")
+    teams = team_table(rows)
+    if len(teams):
+        teams.to_csv(out_root / "team_leaderboard.csv", index=False, encoding="utf-8-sig", lineterminator="\n")
+        for r in teams.itertuples(index=False):
+            ok(f"팀 {r.순위}. {r.팀} ({r.인원}명) : 평균 {pct(r.평균_수익률)}")
     table.to_csv(out_root / "race_equity.csv", index=False, encoding="utf-8-sig", lineterminator="\n")
     payload = {
         "mode": "race",

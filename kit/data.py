@@ -26,7 +26,7 @@ import pandas as pd
 
 from . import sources
 from .console import KitError, warn
-from .paths import CACHE, DATA, MINUTE, OUTPUTS
+from .paths import CACHE, DATA, MINUTE, OUTPUTS, REFERENCE
 
 KST = timezone(timedelta(hours=9))
 MARCAP_URL = "https://github.com/FinanceData/marcap/raw/master/data/marcap-{year}.parquet"
@@ -387,8 +387,8 @@ def cut_dataset(prices, universe, end):
 
 
 def pack(cfg, end=None, folder=None, out=None):
-    """참가자에게 나눠 줄 zip을 만든다. 기본은 연구 기간 끝까지."""
-    end = pd.Timestamp(end) if end else cfg.research_end
+    """참가자에게 나눠 줄 zip을 만든다. 기본은 설정의 데이터 끝(data_end)까지."""
+    end = pd.Timestamp(end) if end else cfg.data_end
     prices, universe, stocks, index_df, old = read_dataset(folder)
     prices, universe, stocks = cut_dataset(prices, universe, end)
     if index_df is not None:
@@ -651,13 +651,33 @@ class Panel:
         return Panel(None, None, None, None, _shared=self._s, _end=i)
 
 
-def load_panel(cfg, folder=None):
+def load_sectors():
+    """업종표 {종목코드: 업종}. 키트에 들어 있는 kit/reference/sectors.csv (없으면 빈 사전)."""
+    path = REFERENCE / "sectors.csv"
+    if not path.exists():
+        return {}
+    df = pd.read_csv(path, dtype={"code": str, "ksic": str}, encoding="utf-8-sig")
+    return dict(zip(df["code"], df["sector"].fillna("미분류")))
+
+
+def load_panel(cfg, folder=None, full=False):
+    """데이터를 Panel로 불러온다.
+
+    설정의 research_lock이 켜져 있으면 연구 기간 끝(research_end)까지만 보이는 Panel을 돌려준다.
+    모의투자 기간까지 계산하는 kit submit · race만 full=True로 전체를 본다.
+    """
     folder = folder_of(folder)
     read_dataset(folder, check_only=True)
     prices = _read_arrays(folder / "prices.parquet")
     universe = pd.read_csv(folder / "universe.csv", dtype={"code": str}, encoding="utf-8-sig", parse_dates=["date"])
     stocks = pd.read_csv(folder / "stocks.csv", dtype={"code": str}, encoding="utf-8-sig")
-    return Panel(prices, universe, stocks, cfg.adjust_anchor)
+    panel = Panel(prices, universe, stocks, cfg.adjust_anchor)
+    panel._s["sectors"] = load_sectors()
+    if cfg.research_lock and not full:
+        cut = int(panel.dates.searchsorted(cfg.research_end, side="right")) - 1
+        if 0 <= cut < len(panel.dates) - 1:
+            panel = panel.until(cut)
+    return panel
 
 
 def load_index(dates, folder=None):

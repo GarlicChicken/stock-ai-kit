@@ -1,11 +1,22 @@
-"""제출 전 전략 파일 점검.
+"""전략 파일 점검 (backtest · submit 전에 자동으로 한다).
 
-다른 사람의 PC(진행자)에서 실행되므로, 파일·인터넷에 손대는 코드가 없는지 미리 본다.
+1. 다른 사람의 PC(진행자)에서도 실행되므로, 파일 · 인터넷에 손대는 코드가 없는지 본다.
+2. 이미 아는 결과로 고르지 않도록, 종목코드 · 종목 이름 · 업종 이름 · 날짜 · 연도를 코드에 직접 적었는지 본다.
+   (업종은 market.sector()로 분산에만 쓴다. 특정 업종을 골라 사는 규칙은 안 된다.)
 완벽한 보안 장치는 아니고, 실수를 막는 점검이다.
 """
 
 import ast
+import re
+from functools import lru_cache
 from pathlib import Path
+
+import pandas as pd
+
+from .paths import REFERENCE
+
+CODE_RE = re.compile(r"^(\d{6}|\d{4}[A-Z]\d)$")
+DATE_RE = re.compile(r"^(19|20)\d\d[-./]?(0[1-9]|1[0-2])([-./]?\d\d)?$")
 
 ALLOWED_IMPORTS = {
     "pandas", "numpy", "math", "statistics", "datetime", "functools", "itertools",
@@ -24,6 +35,44 @@ BANNED_ATTRS = {
     # pandas 파일 도구
     "HDFStore", "ExcelFile", "ExcelWriter",
 }
+
+
+@lru_cache(maxsize=1)
+def _reference_words():
+    """업종표에 있는 종목 이름 · 업종 이름."""
+    path = REFERENCE / "sectors.csv"
+    if not path.exists():
+        return frozenset(), frozenset()
+    df = pd.read_csv(path, dtype=str, encoding="utf-8-sig")
+    names = frozenset(n.strip() for n in df["name"].dropna() if len(n.strip()) >= 2)
+    sectors = frozenset(x.strip() for x in df["sector"].dropna() if x.strip() and x.strip() != "미분류")
+    return names, sectors
+
+
+def _literal_problems(tree):
+    names, sectors = _reference_words()
+    problems = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            v = node.value.strip()
+            if CODE_RE.match(v):
+                problems.append((node.lineno, f"종목코드를 직접 적을 수 없습니다: '{v}' (모든 종목에 같은 조건으로 골라 주세요)"))
+            elif v in names:
+                problems.append((node.lineno, f"종목 이름을 직접 적을 수 없습니다: '{v}'"))
+            elif v in sectors:
+                problems.append((node.lineno, f"업종 이름을 직접 적을 수 없습니다: '{v}' (업종은 분산에만 씁니다)"))
+            elif DATE_RE.match(v):
+                problems.append((node.lineno, f"날짜를 직접 적을 수 없습니다: '{v}' (규칙은 날짜와 상관없이 같아야 합니다)"))
+        elif isinstance(node, ast.Compare):
+            parts = [node.left, *node.comparators]
+            uses_year = any(isinstance(x, ast.Attribute) and x.attr == "year" for x in parts)
+            years = [x.value for x in parts if isinstance(x, ast.Constant) and isinstance(x.value, int)
+                     and not isinstance(x.value, bool) and 1990 <= x.value <= 2100]
+            if uses_year and years:
+                problems.append((node.lineno, f"특정 연도를 조건으로 쓸 수 없습니다: {years[0]}"))
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "name":
+            problems.append((node.lineno, "종목 이름으로 고를 수 없습니다: .name() 은 전략에서 쓰지 않습니다"))
+    return problems
 
 
 def _import_ok(name):
@@ -61,4 +110,5 @@ def check_file(path):
             has_decide = len(node.args.args) >= 1
     if not has_decide:
         problems.append((0, "파일 맨 바깥에 decide(market) 함수가 있어야 합니다."))
+    problems += _literal_problems(tree)
     return sorted(set(problems))

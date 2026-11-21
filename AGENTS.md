@@ -20,8 +20,10 @@
 - 주문(매수 · 매도) 기능은 없고 만들지 않습니다. 연동은 조회만 합니다.
 
 ## 전략 파일 (`strategies/*.py`)
-- `NAME` · `DESCRIPTION` · `REBALANCE`(daily · weekly · monthly)와 `decide(market)`를 둡니다. `decide`는 `{종목코드: 비중}`, 종목코드 목록, `{}`(전부 현금), `KEEP`(그대로 둠) 중 하나를 돌려줍니다.
+- `NAME` · `DESCRIPTION` · `REBALANCE`(daily · weekly · monthly · 2weeks · 3weeks · 10days 등)와 `decide(market)`를 둡니다. `decide`는 `{종목코드: 비중}`, 종목코드 목록, `{}`(전부 현금), `KEEP`(그대로 둠) 중 하나를 돌려줍니다.
 - 고를 수 있는 종목은 그날의 투자 대상(`market.tradable()`)뿐입니다.
+- 이미 아는 결과로 고르지 않습니다: 종목코드 · 종목 이름 · 업종 이름 · 날짜 · 연도를 코드에 직접 적지 않고, `market.name()`으로 고르지 않습니다. 업종(`market.sector()`)은 분산에만 씁니다. backtest · submit이 자동으로 점검합니다.
+- 연구는 연구 기간(설정 `research_end`)까지의 데이터로만 합니다. 모의투자 기간 결과는 `kit submit`으로만 계산합니다.
 - 파일 · 인터넷 접근, 허용되지 않은 import(pandas · numpy · math · statistics · datetime · functools · itertools · collections · typing · dataclasses · kit.helpers 외), `_`로 시작하는 속성, 시드 없는 무작위는 쓰지 않습니다. `kit.connectors`도 전략 파일에서는 쓰지 않습니다.
 - 자세한 내용: `docs/strategy-guide.md`, 백테스트 규칙: `docs/rules.md`
 
@@ -32,4 +34,4 @@
 
 ## 결과
 - 백테스트 결과는 `outputs/<전략 파일 이름>/`에 결과 CSV 양식(`docs/result-spec.md`)으로 저장됩니다. 결과 파일은 읽기만 하고 고치지 않습니다.
-- 정한 기간의 결과 CSV: `uv run kit submit strategies/<파일>.py --name <이름> --start <시작일> --end <끝 날짜>`
+- 모의투자 기간 결과 CSV: `uv run kit submit strategies/<파일>.py --name <이름> --team <팀 이름>`

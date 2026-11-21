@@ -19,6 +19,7 @@ from .console import KitError
 from .helpers import KEEP
 from .market import Market
 from .metrics import summarize
+from .strategy import parse_rebalance
 
 
 @dataclass
@@ -31,23 +32,35 @@ class Result:
     notes: list
 
 
-def _period_key(ts, rebalance):
-    if rebalance == "weekly":
-        iso = ts.isocalendar()
-        return (iso[0], iso[1])
-    if rebalance == "monthly":
-        return (ts.year, ts.month)
-    return ts
+_EPOCH_MONDAY = pd.Timestamp("2000-01-03")
+
+
+def _period_no(ts, unit):
+    """달력에 고정된 기간 번호 (시작일과 상관없이 같은 날에 리밸런싱하도록)."""
+    if unit == "week":
+        return (ts - pd.Timedelta(days=ts.weekday()) - _EPOCH_MONDAY).days // 7
+    if unit == "month":
+        return ts.year * 12 + ts.month - 1
+    return None
 
 
 def decision_days(dates, s, e, rebalance):
-    """s~e 구간에서 decide를 부를 날 (첫날 + 주·달의 마지막 거래일)."""
+    """s~e 구간에서 decide를 부를 날.
+
+    첫날은 늘 부르고, 그 뒤로는 주 · 달 단위면 N번째 주 · 달의 마지막 거래일, 거래일 단위면 N거래일마다.
+    기간 번호를 달력에 고정해 두어 시작일이 달라도 같은 날에 결정한다.
+    """
+    unit, n = parse_rebalance(rebalance)
     days = np.zeros(e - s + 1, dtype=bool)
     for i in range(s, e + 1):
-        if i == s or rebalance == "daily":
+        if i == s:
             days[i - s] = True
-        elif i + 1 >= len(dates) or _period_key(dates[i], rebalance) != _period_key(dates[i + 1], rebalance):
-            days[i - s] = True
+        elif unit == "day":
+            days[i - s] = i % n == 0
+        else:
+            p = _period_no(dates[i], unit)
+            last = i + 1 >= len(dates) or _period_no(dates[i + 1], unit) != p
+            days[i - s] = last and p % n == n - 1
     return days
 
 

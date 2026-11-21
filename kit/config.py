@@ -13,7 +13,9 @@ from .paths import CONFIG
 @dataclass(frozen=True)
 class Config:
     data_start: pd.Timestamp
+    data_end: pd.Timestamp
     research_end: pd.Timestamp
+    research_lock: bool
     compare_start: pd.Timestamp
     compare_end: pd.Timestamp
     top_n: int
@@ -53,7 +55,9 @@ def load_config(path=None):
     research_end = pd.Timestamp(period.get("research_end", "2024-12-31"))
     return Config(
         data_start=pd.Timestamp(period.get("data_start", "2000-01-01")),
+        data_end=pd.Timestamp(period.get("data_end", research_end)),
         research_end=research_end,
+        research_lock=bool(period.get("research_lock", False)),
         compare_start=pd.Timestamp(period.get("compare_start", "2025-01-02")),
         compare_end=pd.Timestamp(period.get("compare_end", "2026-10-30")),
         top_n=int(data.get("top_n", 200)),

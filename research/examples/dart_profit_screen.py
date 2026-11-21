@@ -1,7 +1,7 @@
 """예시: 영업이익이 해마다 꾸준히 늘어난 종목 찾기 (DART 재무제표)
 
 필요한 키: DART_API_KEY
-실행: uv run python research/examples/dart_profit_screen.py --date 2024-12-30 --years 3
+실행: uv run python research/examples/dart_profit_screen.py --date 2022-12-29 --years 3
 
 - 기준일의 투자 대상(시가총액 상위 200개)에서, 최근 years개 사업연도 영업이익이 매년 늘어난 종목을 고른다.
 - 기준일까지 '공시된' 사업보고서만 쓴다 (available_date <= 기준일). 3월 결산 공시 전이면 전년도까지 본다.
@@ -18,7 +18,7 @@ from kit.config import load_config
 from kit.connectors import dart
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--date", default="2024-12-30")
+ap.add_argument("--date", default="2022-12-29")
 ap.add_argument("--years", type=int, default=3, help="연속 증가를 볼 해 수")
 ap.add_argument("--limit", type=int, default=200, help="시가총액 상위 몇 개까지 볼지")
 args = ap.parse_args()

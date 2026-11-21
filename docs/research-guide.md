@@ -14,7 +14,7 @@
 | `uv run kit backtest --cost-x 1.5` | 비용(수수료 · 세금)을 1.5배로 다시 계산 |
 
 ```bash
-uv run kit factor reversal_5 --start 2016-01-01 --end 2024-12-31 --horizon 5
+uv run kit factor reversal_5 --start 2010-01-04 --end 2022-12-29 --horizon 5
 uv run python research/examples/factor_lab.py        # 12종 한꺼번에 + p값 보정
 ```
 

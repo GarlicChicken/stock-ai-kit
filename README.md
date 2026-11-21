@@ -10,12 +10,19 @@
 
 | 모듈 | 하는 일 | 문서 |
 |---|---|---|
-| 표준 데이터 (`kit.data`) | 한국거래소 일별 데이터(2000~), 매달 그때의 시가총액 상위 200종목, **상장폐지 종목 포함**, 수정주가, 데이터 지문 | [데이터 출처](docs/data-sources.md) |
+| 표준 데이터 (`kit.data`) | 한국거래소 일봉(2000 ~ 2025), 매달 그때의 시가총액 상위 200종목, **상장폐지 종목 포함**, 수정주가, 업종표, 데이터 지문 | [데이터 출처](docs/data-sources.md) |
 | 외부 연동 (`kit.connectors`) | DART 공시 · 재무제표, 네이버 뉴스, 한국은행 ECOS, 한국투자증권(조회), KRX, 해외 지수 · 미국 경제지표 | [외부 연동](docs/connectors.md) |
-| 백테스트 (`kit.engine`) | 다음 날 시가 체결, 수수료 · 연도별 증권거래세, 거래정지 · 상장폐지 처리, 투자 대상 밖 종목 차단 | [백테스트 규칙](docs/rules.md) · [전략 작성법](docs/strategy-guide.md) |
+| 백테스트 (`kit.engine`) | 시작 금액 1억 원, 다음 날 시가 체결, 수수료 · 연도별 증권거래세, 거래정지 · 상장폐지 처리, 매일 · N주 · N달 리밸런싱, 연구 기간 잠금, 종목 직접 지정 점검 | [백테스트 규칙](docs/rules.md) · [전략 작성법](docs/strategy-guide.md) |
 | 연구 도구 (`kit.lab`) | 기본 신호 12종, 신호 검증(IC · 5분위), 우연 검사(플라시보 · 신뢰구간 · 다중 검정 보정), 이벤트 스터디, 거래일 · 공시 시점 처리 | [연구 방법](docs/research-guide.md) |
 | 결과 양식 (`kit.result`) | 모든 결과를 같은 CSV(날짜별 평가금액)로 저장 · 점검 | [결과 CSV 양식](docs/result-spec.md) |
-| 수익 레이스 (`race.html`) | 여러 결과 CSV를 끌어다 놓으면 평가금액 그래프와 순위가 움직이며 재생 | [결과 모아 비교하기](docs/race.md) |
+| 수익 레이스 (`race.html`) | 여러 결과 CSV를 끌어다 놓으면 평가금액 그래프와 순위가 움직이며 재생. 개인 · 팀(평균) 보기, 기간 바꾸기 | [결과 모아 비교하기](docs/race.md) |
+
+## 기간 (설정 `config/kit.toml`)
+
+| 구분 | 기간 |
+|---|---|
+| 연구 기간 | 2000-01-04 ~ 2022-12-29: 전략을 만들고 시험. 연구 명령은 이 기간만 봄 |
+| 모의투자 기간 | 2023-01-02 ~ 2025-12-30 (3년): `kit submit`으로 마지막에 한 번 계산 |
 
 ## 설치
 
@@ -41,20 +48,21 @@
 | 외부 연동 | `keys` · `keys set <이름>` · `keys test` | 키 보기 · 설정(터미널에서 직접 입력) · 연결 점검 |
 | 전략 | `new` · `backtest` · `lookahead` · `screen` | 새 전략 · 백테스트(`--cost-x`로 비용 민감도) · 미래 데이터 검사 · 그날 고르는 종목 |
 | 연구 | `factor list` · `factor <신호>` · `event <CSV>` | 신호 목록 · 신호 검증 · 이벤트 스터디 |
-| 결과 | `submit` · `validate` · `race` | 정한 기간의 결과 CSV 만들기 · 양식 점검 · 수익 레이스 |
+| 결과 | `submit` · `validate` · `race` | 모의투자 기간 결과 CSV(`--team`으로 팀 이름) · 양식 점검 · 수익 레이스 |
 
 ## 폴더
 
 ```
 stock-ai-kit/
-├ strategies/          전략 파일 (examples/ 예시 3개)
+├ strategies/          전략 파일 (examples/ 예시 7개: 동일 비중 · 골든크로스 · 모멘텀 · 추세추종 · 눌림목 · 섹터분산 · 현금 비중 조절)
 ├ research/            자유 연구 · examples/ 연동 · 연구 도구 사용 예시
 ├ data/                표준 데이터 (저장소에 없음)
 ├ outputs/             결과 CSV · 리포트
 ├ submissions/         모으는 결과 CSV
 ├ kit/                 엔진
 │  ├ connectors/       외부 연동 (dart · naver_news · ecos · kis · krx · world)
-│  └ lab/              연구 도구 (signals · factor_test · robustness · event_study · calendar)
+│  ├ lab/              연구 도구 (signals · factor_test · robustness · event_study · calendar)
+│  └ reference/        업종표 (sectors.csv)
 ├ config/              공통 설정
 ├ docs/                설명서
 ├ race.html            수익 레이스 화면
@@ -68,5 +76,5 @@ stock-ai-kit/
 
 ## 사용한 오픈소스 · 데이터
 
-[FinanceData/marcap](https://github.com/FinanceData/marcap) · [FinanceDataReader](https://github.com/FinanceData/FinanceDataReader) · [pykrx](https://github.com/sharebook-kr/pykrx) · [yfinance](https://github.com/ranaroussi/yfinance) · [pandas](https://pandas.pydata.org) · [numpy](https://numpy.org) · [pyarrow](https://arrow.apache.org) · [uv](https://github.com/astral-sh/uv) ·
+[FinanceData/marcap](https://github.com/FinanceData/marcap) · 업종: OpenDART 기업개황 업종코드(KSIC) · [FinanceDataReader](https://github.com/FinanceData/FinanceDataReader) · [pykrx](https://github.com/sharebook-kr/pykrx) · [yfinance](https://github.com/ranaroussi/yfinance) · [pandas](https://pandas.pydata.org) · [numpy](https://numpy.org) · [pyarrow](https://arrow.apache.org) · [uv](https://github.com/astral-sh/uv) ·
 OpenDART · NAVER API HUB · 한국은행 ECOS · 한국투자증권 Open API · KRX Open API · FRED

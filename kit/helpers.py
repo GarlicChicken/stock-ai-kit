@@ -54,3 +54,20 @@ def only(values, codes):
     """values(Series)에서 codes에 든 종목만 남긴다."""
     s = pd.Series(values)
     return s[s.index.isin(list(codes))]
+
+
+def limit_per_sector(codes, market, n):
+    """codes를 앞에서부터 보며 업종마다 n종목까지만 남긴다 (섹터분산). 순서는 그대로."""
+    out, count = [], {}
+    for c in codes:
+        sec = market.sector(c)
+        if count.get(sec, 0) < int(n):
+            out.append(c)
+            count[sec] = count.get(sec, 0) + 1
+    return out
+
+
+def scale(weights, ratio):
+    """비중을 ratio배로 줄인다. 예: scale(equal_weight(codes), 0.5) → 절반만 투자하고 나머지는 현금."""
+    ratio = max(0.0, min(1.0, float(ratio)))
+    return {c: w * ratio for c, w in dict(weights).items()}

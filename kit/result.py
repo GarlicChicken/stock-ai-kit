@@ -19,6 +19,7 @@ from .helpers import KEEP
 
 SPEC = "stock-ai-kit-result/1"
 RESULT_COLUMNS = ["date", "name", "strategy", "equity", "cash", "stock_value", "return", "drawdown", "positions"]
+OPTIONAL_COLUMNS = ["team"]  # 팀 이름 (없어도 됨). 레이스에서 팀별 평균을 낼 때 쓴다.
 WEIGHT_COLUMNS = ["date", "code", "name", "weight"]
 TRADE_COLUMNS = ["date", "code", "name", "side", "qty", "price", "amount", "fee", "tax"]
 
@@ -36,7 +37,7 @@ def _dates(df):
     return df
 
 
-def result_frame(result, person=""):
+def result_frame(result, person="", team=""):
     eq = result.equity
     out = pd.DataFrame({
         "date": eq["date"],
@@ -49,10 +50,12 @@ def result_frame(result, person=""):
         "drawdown": eq["drawdown"].round(6),
         "positions": eq["positions"].astype("int64"),
     })
+    if team:
+        out["team"] = str(team).strip()
     return _dates(out)
 
 
-def files_for(result, person="", extra_meta=None):
+def files_for(result, person="", extra_meta=None, team=""):
     """결과 규격 파일들의 내용 {파일 이름: bytes}."""
     weights = _dates(result.weights)[WEIGHT_COLUMNS]
     trades = _dates(result.trades)[TRADE_COLUMNS].copy()
@@ -60,6 +63,7 @@ def files_for(result, person="", extra_meta=None):
     meta = {
         "spec": SPEC,
         "name": person or "",
+        "team": team or "",
         "strategy": result.strategy.name,
         "description": result.strategy.description,
         "rebalance": result.strategy.rebalance,
@@ -72,7 +76,7 @@ def files_for(result, person="", extra_meta=None):
     }
     meta.update(extra_meta or {})
     return {
-        "result.csv": _csv_bytes(result_frame(result, person), float_format="%.6f"),
+        "result.csv": _csv_bytes(result_frame(result, person, team), float_format="%.6f"),
         "weights.csv": _csv_bytes(weights, float_format="%.6f"),
         "trades.csv": _csv_bytes(trades),
         "meta.json": json.dumps(meta, ensure_ascii=False, indent=2).encode("utf-8"),
@@ -102,7 +106,8 @@ def read_submission(path):
     r = _read_csv_bytes(path.read_bytes())
     name = str(r["name"].dropna().iloc[0]) if "name" in r and r["name"].notna().any() else path.stem
     strategy = str(r["strategy"].dropna().iloc[0]) if "strategy" in r and r["strategy"].notna().any() else ""
-    return {"path": path, "result": r, "name": name, "strategy": strategy}
+    team = str(r["team"].dropna().iloc[0]).strip() if "team" in r and r["team"].notna().any() else ""
+    return {"path": path, "result": r, "name": name, "strategy": strategy, "team": team}
 
 
 # ---------------------------------------------------------------- 점검
@@ -133,6 +138,8 @@ def validate(result_df, meta=None, calendar=None, start=None, end=None, initial_
             errors.append(f"{col} 칸이 비어 있습니다.")
         elif vals.nunique() > 1:
             errors.append(f"{col} 값은 한 파일 안에서 하나여야 합니다.")
+    if "team" in df.columns and df["team"].dropna().astype(str).str.strip().nunique() > 1:
+        errors.append("team 값은 한 파일 안에서 하나여야 합니다.")
     num = {c: pd.to_numeric(df[c], errors="coerce") for c in ("equity", "cash", "stock_value", "return", "drawdown", "positions")}
     for c, s in num.items():
         if s.isna().any():

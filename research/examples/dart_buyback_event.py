@@ -1,7 +1,7 @@
 """예시: 자기주식 취득 결정 공시가 나온 뒤 주가는 어떻게 움직였나 (DART + 이벤트 스터디)
 
 필요한 키: DART_API_KEY
-실행: uv run python research/examples/dart_buyback_event.py --start 2023-01-01 --end 2024-12-31
+실행: uv run python research/examples/dart_buyback_event.py --start 2019-01-01 --end 2022-12-31
 
 1) DART 주요사항보고(B) 공시에서 '자기주식취득결정'만 골라 이벤트 표를 만든다.
 2) 공시 접수일 장 마감 뒤에 알았다고 보고, 다음 거래일 시가에 산다고 가정해 10거래일 누적 초과수익을 본다.
@@ -19,8 +19,8 @@ from kit.connectors import dart
 from kit.lab import event_study
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--start", default="2023-01-01")
-ap.add_argument("--end", default="2024-12-31")
+ap.add_argument("--start", default="2019-01-01")
+ap.add_argument("--end", default="2022-12-31")
 ap.add_argument("--keyword", default="자기주식취득결정")
 ap.add_argument("--horizon", type=int, default=10)
 args = ap.parse_args()

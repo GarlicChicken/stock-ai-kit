@@ -14,5 +14,6 @@ CACHE = ROOT / ".cache"
 
 SAMPLE = PACKAGE / "sample"
 TEMPLATES = PACKAGE / "templates"
+REFERENCE = PACKAGE / "reference"
 
 MINUTE = DATA / "minute"

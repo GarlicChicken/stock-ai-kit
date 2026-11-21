@@ -6,8 +6,8 @@
 ## 1. 같은 데이터 나누기
 
 ```bash
-uv run kit data download --end today        # 2000년 ~ 오늘까지. 처음에는 원천 파일 약 500MB를 받음
-uv run kit data pack --end <끝 날짜>          # 그 날짜까지 담은 zip (기본은 2024-12-31까지)
+uv run kit data download                    # 설정의 데이터 끝(2025-12-31)까지. 처음에는 원천 파일 약 500MB를 받음
+uv run kit data pack                        # 같은 데이터를 zip으로 (나눠 주기용)
 ```
 
 - 만들어진 zip(`outputs/share/stock-ai-kit-data_<시작>_<끝>.zip`)을 나눠 주고, 받은 쪽은 `uv run kit data unpack <zip>`.
@@ -17,8 +17,11 @@ uv run kit data pack --end <끝 날짜>          # 그 날짜까지 담은 zip (
 ## 2. 같은 기간의 결과 CSV 만들기
 
 ```bash
-uv run kit submit strategies/<파일>.py --name <이름> --start <시작일> --end <끝 날짜>
+uv run kit submit strategies/<파일>.py --name <이름> --team <팀 이름>
 ```
+
+- 기간은 설정의 모의투자 기간(`config/kit.toml`의 `compare_start` ~ `compare_end`)입니다. 다른 기간은 `--start` · `--end`로 정합니다.
+- 연구 명령(backtest 등)은 연구 기간까지만 보이므로, 모의투자 기간 결과는 이 명령으로만 나옵니다.
 
 - 코드 점검(파일 · 인터넷 접근 금지) · 미래 데이터 검사 · 백테스트 · 양식 점검을 차례로 하고
   `submissions/<이름>_<전략>.csv` 하나를 만듭니다. `name` 칸이 레이스 화면의 이름이 됩니다.
@@ -37,12 +40,14 @@ uv run kit race
 ```
 
 - 양식에 맞지 않는 CSV는 빼고, 이유를 보여 줍니다.
-- CSV마다 기간이 다르면 겹치는 기간으로 맞추고, 같은 출발선에서 비교하도록 그 시작일 평가금액을 모두 1,000만 원으로 다시 맞춥니다(수익률 흐름은 그대로).
+- CSV마다 기간이 다르면 겹치는 기간으로 맞춥니다. 시작 금액은 CSV들의 첫날 평가금액(보통 1억 원)을 쓰고, 다르면 같은 출발선으로 다시 맞춥니다(수익률 흐름은 그대로).
+- **[개인] · [팀]**: CSV에 팀 이름(`team`)이 있으면 [팀] 보기에서 팀원 평가금액의 평균으로 팀끼리 비교합니다. 팀이 없는 CSV는 '(개인)'으로 따로 나옵니다.
+- **기간 바꾸기**: 아래쪽 날짜 두 칸으로 재생할 기간을 고릅니다. 바꾼 기간의 첫날을 같은 출발선으로 다시 맞춥니다 (예: 2025년만 따로 보기).
 - 이름이 같으면 '(2)'를 붙여 구분합니다.
 - 화면: [재생]을 누르면 날짜가 흐르며 평가금액 그래프와 순위표가 움직이고, 순위가 바뀌면 ▲ · ▼가 표시됩니다.
   순위표 줄은 0.35초마다 자리를 바꾸고 숫자는 계속 움직입니다.
   스페이스바 재생 · 일시정지, 좌우 방향키 이동, [평가금액] · [수익률] 보기 변경, 속도 4단계.
-- `kit race`는 `outputs/race/`에 `leaderboard.csv`(최종 순위)와 `race_equity.csv`(날짜별 평가금액)도 남깁니다.
+- `kit race`는 `outputs/race/`에 `leaderboard.csv`(최종 순위), `team_leaderboard.csv`(팀 순위, 팀이 있을 때), `race_equity.csv`(날짜별 평가금액)도 남깁니다.
 
 ## 주의
 

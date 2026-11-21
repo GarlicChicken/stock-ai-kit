@@ -20,7 +20,7 @@ from .console import KitError, fail, head, ok, pct, setup, warn, won
 from .engine import run_backtest
 from .paths import OUTPUTS, ROOT, SAMPLE, STRATEGIES, SUBMISSIONS, TEMPLATES
 from .report import save_result
-from .strategy import REBALANCE, load_strategy
+from .strategy import load_strategy, rebalance_label
 
 PACKAGES = ["pandas", "numpy", "pyarrow", "finance-datareader", "pykrx", "yfinance"]
 
@@ -115,6 +115,9 @@ def cmd_check(args):
         fail(f"샘플 시험 중 오류: {type(e).__name__}: {e}")
 
     head("3. 데이터 (data 폴더)")
+    cfg = load_config()
+    print(f"     연구 기간 ~ {cfg.research_end.date()} · 모의투자 기간 {cfg.compare_start.date()} ~ {cfg.compare_end.date()} · "
+          f"시작 금액 {won(cfg.initial_cash)}")
     info = data.describe(None)
     if info is None:
         warn("아직 데이터가 없습니다.")
@@ -180,8 +183,8 @@ def cmd_data(args):
     folder = Path(args.data) if args.data else None
     where = _rel(folder) if folder else "data"
     if args.action == "download":
-        # 기본은 연구 기간 끝까지. 최신까지 받으려면 --end today
-        end = None if (args.end or "").lower() == "today" else (args.end or cfg.research_end)
+        # 기본은 설정의 데이터 끝(data_end)까지. 최신까지 받으려면 --end today
+        end = None if (args.end or "").lower() == "today" else (args.end or cfg.data_end)
         t0 = time.time()
         m = data.download(cfg, args.start, end, folder=folder, top_n=args.top, refresh=args.refresh)
         ok(f"{where} 폴더에 저장했습니다 ({time.time() - t0:.0f}초)")
@@ -247,10 +250,31 @@ def _period(args, cfg, default_start, default_end):
             pd.Timestamp(args.end) if args.end else default_end)
 
 
+def _research_period(args, cfg):
+    """연구 명령의 기간. 연구 기간 끝을 넘기면 멈추고 알려 준다 (research_lock)."""
+    start, end = _period(args, cfg, cfg.data_start, cfg.research_end)
+    if cfg.research_lock and end > cfg.research_end:
+        raise KitError(f"연구는 {cfg.research_end.date()}까지의 데이터로만 합니다. "
+                       f"모의투자 기간({cfg.compare_start.date()} ~ {cfg.compare_end.date()})은 마지막에 "
+                       "'uv run kit submit'으로 한 번 계산합니다.")
+    return start, end
+
+
+def _guard_or_fail(path):
+    """전략 파일 점검. 문제가 있으면 줄마다 알려 주고 False."""
+    problems = guard.check_file(path)
+    for line, msg in problems:
+        fail(f"{Path(path).name} {line}줄: {msg}")
+    return not problems
+
+
 def cmd_backtest(args):
     cfg = load_config()
+    start, end = _research_period(args, cfg)
+    if not _guard_or_fail(args.file):
+        print("     전략 파일을 고친 뒤 다시 실행해 주세요. (규칙: docs/strategy-guide.md)")
+        return 1
     panel = data.load_panel(cfg, args.data)
-    start, end = _period(args, cfg, cfg.data_start, cfg.research_end)
     strategy = load_strategy(args.file)
     if args.cost_x != 1.0:  # 비용 민감도: 수수료 · 세금 · 슬리피지를 배수로
         import dataclasses
@@ -267,7 +291,7 @@ def cmd_backtest(args):
     if args.quiet:
         print(json.dumps({"total_return": s["total_return"], "final_equity": s["final_equity"]}))
         return 0
-    head(f"{strategy.name} ({REBALANCE[strategy.rebalance]} 리밸런싱)")
+    head(f"{strategy.name} ({rebalance_label(strategy.rebalance)} 리밸런싱)")
     print(f"     기간       {s['start']} ~ {s['end']} ({s['days']}거래일, {time.time() - t0:.1f}초)")
     print(f"     최종 자산  {won(s['final_equity'])} (시작 {won(s['initial_cash'])})")
     print(f"     총수익률   {pct(s['total_return'])} · 연평균 {pct(s['cagr'])}")
@@ -288,8 +312,8 @@ def _data_meta(folder=None):
 
 def cmd_lookahead(args):
     cfg = load_config()
+    start, end = _research_period(args, cfg)
     panel = data.load_panel(cfg, args.data)
-    start, end = _period(args, cfg, cfg.data_start, cfg.research_end)
     good, msg = lookahead.check(args.file, panel, cfg, start, end)
     (ok if good else fail)(msg)
     return 0 if good else 1
@@ -321,16 +345,13 @@ def cmd_submit(args):
     start = pd.Timestamp(args.start) if args.start else cfg.compare_start
     end = pd.Timestamp(args.end) if args.end else cfg.compare_end
     head("1. 코드 점검")
-    problems = guard.check_file(path)
-    if problems:
-        for line, msg in problems:
-            fail(f"{line}줄: {msg}")
+    if not _guard_or_fail(path):
         return 1
-    ok("파일 · 인터넷 접근 없음")
-    panel = data.load_panel(cfg)
+    ok("파일 · 인터넷 접근 없음 · 종목코드 · 이름 · 날짜를 직접 적지 않음")
+    panel = data.load_panel(cfg, full=True)
     if panel.dates[0] > start or panel.dates[-1] < end - pd.Timedelta(days=5):
         raise KitError(f"데이터가 {panel.dates[0].date()} ~ {panel.dates[-1].date()}입니다. 기간 {start.date()} ~ {end.date()}이 "
-                       "들어 있는 데이터가 필요합니다. 진행자에게 그 기간까지 담긴 데이터 zip을 받아 주세요.")
+                       "들어 있는 데이터가 필요합니다. 'uv run kit data download'로 데이터를 다시 받아 주세요.")
     head("2. 미래 데이터 · 무작위 검사")
     good, msg = lookahead.check(path, panel, cfg, cfg.data_start, min(end, panel.dates[-1]))
     (ok if good else fail)(msg)
@@ -340,13 +361,14 @@ def cmd_submit(args):
     result = run_backtest(load_strategy(path), panel, cfg, start, end)
     s = result.summary
     print(f"     최종 평가금액 {won(s['final_equity'])} · 총수익률 {pct(s['total_return'])} · 최대 낙폭 {pct(s['mdd'])} · 거래 {s['trades']}건")
-    csv_bytes = spec.files_for(result, args.name)["result.csv"]
+    csv_bytes = spec.files_for(result, args.name, team=args.team or "")["result.csv"]
     errors, _ = spec.validate(pd.read_csv(io.BytesIO(csv_bytes), encoding="utf-8-sig"), calendar=panel.dates,
                               start=start, end=end, initial_cash=cfg.initial_cash)
     if errors:
         raise KitError("결과 CSV가 양식에 맞지 않습니다: " + errors[0])
     SUBMISSIONS.mkdir(parents=True, exist_ok=True)
-    out = SUBMISSIONS / f"{_safe_name(args.name)}_{_safe_name(path.stem)}.csv"
+    prefix = f"{_safe_name(args.team)}_" if args.team else ""
+    out = SUBMISSIONS / f"{prefix}{_safe_name(args.name)}_{_safe_name(path.stem)}.csv"
     out.write_bytes(csv_bytes)
     print()
     ok(f"결과 CSV를 만들었습니다: {_rel(out)}")
@@ -359,7 +381,7 @@ def cmd_validate(args):
 
     cfg = load_config()
     try:
-        calendar = data.load_panel(cfg).dates
+        calendar = data.load_panel(cfg, full=True).dates
     except KitError:
         calendar = None
     start = pd.Timestamp(args.start) if args.start else None
@@ -397,7 +419,7 @@ def cmd_race(args):
 
     cfg = load_config()
     try:
-        panel = data.load_panel(cfg)
+        panel = data.load_panel(cfg, full=True)
         calendar, index_table = panel.dates, data.load_index(panel.dates)
     except KitError:
         calendar, index_table = None, None
@@ -408,7 +430,8 @@ def cmd_race(args):
     html, rows = run_race(folder, cfg, calendar, index_table, start, end)
     head("순위 (마지막 날 평가금액)")
     for r in rows:
-        print(f"     {r['순위']:>2}. {r['이름']} · {r['전략']} : {won(r['최종 평가금액'])} ({pct(r['총수익률'])})")
+        team = f" [{r['팀']}]" if r.get("팀") else ""
+        print(f"     {r['순위']:>2}. {r['이름']}{team} · {r['전략']} : {won(r['최종 평가금액'])} ({pct(r['총수익률'])})")
     print(f"\n레이스 화면: {_rel(html)}  ([재생]을 눌러 주세요)")
     if not args.no_open:
         webbrowser.open(Path(html).resolve().as_uri())
@@ -578,7 +601,7 @@ def build_parser():
                    help="download 받기 · unpack zip 풀기 · verify 확인 · info 현황 · calendar 거래일 목록 · minute 분봉 쌓기 · pack 묶기(진행자)")
     d.add_argument("file", nargs="?", help="unpack: zip 경로 · minute: 종목코드")
     d.add_argument("--start", help="시작일 (download 기본: 2000-01-01, 가장 이른 날: 1995-05-02)")
-    d.add_argument("--end", help="끝 날짜 (download · pack 기본: 연구 기간 끝 · 최신까지는 today)")
+    d.add_argument("--end", help="끝 날짜 (download · pack 기본: 설정의 데이터 끝 · 최신까지는 today)")
     d.add_argument("--top", type=int, help="매달 시가총액 상위 몇 종목을 투자 대상으로 할지 (기본 200)")
     d.add_argument("--data", help="데이터 폴더 (기본: data). 개인 연구용 데이터는 research/ 아래 다른 폴더에")
     d.add_argument("--refresh", action="store_true", help="원천 파일을 새로 받기")
@@ -603,10 +626,11 @@ def build_parser():
             b.add_argument("--quiet", action="store_true", help=argparse.SUPPRESS)
         b.set_defaults(func=fn)
 
-    s = sub.add_parser("submit", help="진행자에게 보낼 결과 CSV 만들기 (진행자가 알려 준 기간)")
+    s = sub.add_parser("submit", help="모의투자 기간 결과 CSV 만들기 (진행자에게 보낼 파일)")
     s.add_argument("file", help="전략 파일 경로")
     s.add_argument("--name", required=True, help="이름 또는 닉네임")
-    s.add_argument("--start", help="기간 시작 (진행자가 알려 준 날짜. 기본: 설정의 레이스 기간)")
+    s.add_argument("--team", help="팀 이름 (레이스에서 팀별 평균을 낼 때 씀)")
+    s.add_argument("--start", help="기간 시작 (기본: 설정의 모의투자 기간)")
     s.add_argument("--end", help="기간 끝")
     s.set_defaults(func=cmd_submit)
 

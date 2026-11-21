@@ -19,6 +19,8 @@ class Market:
     market.price()       오늘 실제 종가 (수정 전, 원)
     market.holdings      지금 들고 있는 종목과 비중 {종목코드: 비중}
     market.name(code) · market.market(code)  종목 이름(그날 기준) · 시장
+    market.sector(code)  업종 (섹터분산용. 키트 업종표 기준, 없으면 '미분류')
+    market.sectors(codes) 여러 종목의 업종 (Series)
     """
 
     def __init__(self, panel, i, holdings=None):
@@ -59,6 +61,14 @@ class Market:
 
     def market(self, code):
         return self._panel.market_on(code, self.today)
+
+    def sector(self, code):
+        return self._panel._s.get("sectors", {}).get(str(code), "미분류")
+
+    def sectors(self, codes=None):
+        codes = self.codes if codes is None else list(codes)
+        table = self._panel._s.get("sectors", {})
+        return pd.Series([table.get(str(c), "미분류") for c in codes], index=codes, dtype="object")
 
     def __repr__(self):
         return f"Market(today={self.today.date()}, days={len(self.dates)}, universe={len(self.universe())})"

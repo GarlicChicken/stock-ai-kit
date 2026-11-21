@@ -9,12 +9,14 @@ adjust_anchor = "2024-12-31"   # 수정주가 기준일: 이 날 이전 마지�
 
 [period]
 data_start = "2000-01-01"      # 데이터 시작일
-research_end = "2024-12-31"    # 연구 기간 끝 (참가자에게 나눠 주는 데이터의 끝)
-compare_start = "2025-01-02"   # 레이스(제출) 기간 기본값 시작. 실제 기간은 진행자가 정해 --start로 알려 줌
-compare_end = "2026-10-30"     # 레이스(제출) 기간 기본값 끝
+data_end = "2025-12-31"        # 데이터 끝 (kit data download · pack 기본값)
+research_end = "2022-12-31"    # 연구 기간 끝: backtest · factor · screen · 연구 스크립트는 이 날까지만 본다
+research_lock = true           # true면 연구 기간 뒤(모의투자 기간)는 kit submit으로만 계산한다
+compare_start = "2023-01-02"   # 모의투자(레이스) 기간 시작: kit submit 기본값
+compare_end = "2025-12-30"     # 모의투자(레이스) 기간 끝
 
 [account]
-initial_cash = 10000000        # 시작 금액 (원)
+initial_cash = 100000000       # 시작 금액 (원)
 cash_buffer = 0.002            # 수수료·세금 여유분으로 남겨 두는 현금 비율 (0.2%)
 
 [cost]
