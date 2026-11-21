@@ -427,11 +427,16 @@ def cmd_race(args):
     start = pd.Timestamp(args.start) if args.start else None
     end = pd.Timestamp(args.end) if args.end else None
     folder = Path(args.folder) if args.folder else SUBMISSIONS
-    html, rows = run_race(folder, cfg, calendar, index_table, start, end)
-    head("순위 (마지막 날 평가금액)")
+    html, rows, teams = run_race(folder, cfg, calendar, index_table, start, end)
+    head("개인 순위 (마지막 날 평가금액)")
     for r in rows:
         team = f" [{r['팀']}]" if r.get("팀") else ""
         print(f"     {r['순위']:>2}. {r['이름']}{team} · {r['전략']} : {won(r['최종 평가금액'])} ({pct(r['총수익률'])})")
+    if len(teams):
+        head("팀 순위 (팀원 평균)")
+        for t in teams.to_dict("records"):
+            print(f"     {t['순위']:>2}. {t['팀']} ({t['팀원']}) : 평균 {won(t['평균 평가금액'])} ({pct(t['평균 수익률'])})"
+                  f" · 최대 낙폭 {pct(t['최대 낙폭'])}")
     print(f"\n레이스 화면: {_rel(html)}  ([재생]을 눌러 주세요)")
     if not args.no_open:
         webbrowser.open(Path(html).resolve().as_uri())

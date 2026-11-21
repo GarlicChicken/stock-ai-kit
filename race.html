@@ -65,6 +65,19 @@
   .report main { min-height: 380px; }
   .report aside { width: 300px; }
   .hidden { display: none !important; }
+  #final { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(18, 18, 18, .9); z-index: 4; }
+  #final .box { width: min(1240px, 94vw); max-height: 90vh; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 24px 28px; }
+  #final .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+  #final h2 { margin: 0; font-size: 28px; font-weight: 800; }
+  #final .cols { display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; margin-top: 18px; }
+  #final .cols.one { grid-template-columns: 1fr; }
+  #final h3 { margin: 0 0 8px; font-size: 15px; color: var(--accent); }
+  #final td, #final th { padding: 7px 8px; }
+  #final .l { text-align: left !important; }
+  #final .rk { font-weight: 800; color: var(--dim); }
+  #final tr.win td { background: rgba(132, 255, 74, .1); }
+  #final tr.win .rk { color: var(--accent); }
+  #final .mem { color: var(--dim); font-size: 12px; }
   #drop { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: var(--bg); z-index: 5; }
   #drop .box { width: min(720px, 90vw); border: 2px dashed #555; border-radius: 18px; padding: 48px 40px; text-align: center; }
   #drop.over .box { border-color: var(--accent); background: rgba(132, 255, 74, .06); }
@@ -84,6 +97,13 @@
   <div class="pick"><button class="primary" id="pickBtn">파일 선택</button>
   <input type="file" id="pick" accept=".csv" multiple hidden></div>
   <div class="msg" id="dropMsg"></div>
+</div></div>
+<div id="final" class="hidden"><div class="box">
+  <div class="top"><div><h2>최종 결과</h2><div class="sub" id="finalSub"></div></div><button id="finalClose">닫기</button></div>
+  <div class="cols" id="finalCols">
+    <section><h3>개인 순위</h3><table id="finalPerson"></table></section>
+    <section id="finalTeamBox"><h3>팀 순위 (팀원 평균)</h3><table id="finalTeam"></table></section>
+  </div>
 </div></div>
 <header>
   <div>
@@ -112,6 +132,7 @@
   <button id="modeAmt" class="on">평가금액</button>
   <button id="modePct">수익률</button>
   <span id="viewBox" class="hidden"><button id="viewPerson" class="on">개인</button> <button id="viewTeam">팀</button></span>
+  <button id="finalBtn">최종 결과</button>
   <span class="period" title="기간을 바꾸면 그 첫날을 같은 출발선으로 다시 맞춥니다"><input type="date" id="from" aria-label="시작일"> ~ <input type="date" id="to" aria-label="끝 날짜"></span>
   <button id="again" class="hidden">파일 다시 선택</button>
   <input type="range" id="seek" min="0" max="0" value="0" step="0.01" aria-label="날짜 이동">
@@ -277,7 +298,10 @@ function tick(t) {
   const dt = last ? Math.min(0.1, (t - last) / 1000) : 0; last = t;
   if (playing) {
     frame = Math.min(N - 1, frame + dt * Number($("speed").value));
-    if (frame >= N - 1) setPlaying(false);
+    if (frame >= N - 1) {
+      setPlaying(false);
+      if (race && RAW && !finalShown) { finalShown = true; setTimeout(showFinal, 1200); }
+    }
   }
   const [lo, hi] = targetRange(frame);
   const k = race ? 0.12 : 1;
@@ -324,8 +348,11 @@ function start(d) {
     $("seek").max = N - 1; $("seek").value = 0;
     if (!bound) {
       bound = true;
-      $("play").onclick = () => { if (frame >= N - 1) frame = 0; setPlaying(!playing); };
-      $("reset").onclick = () => { frame = 0; setPlaying(false); };
+      $("play").onclick = () => { if (frame >= N - 1) { frame = 0; finalShown = false; } setPlaying(!playing); };
+      $("finalBtn").onclick = showFinal;
+      $("finalClose").onclick = hideFinal;
+      $("final").addEventListener("click", (e) => { if (e.target.id === "final") hideFinal(); });
+      $("reset").onclick = () => { frame = 0; finalShown = false; setPlaying(false); };
       $("seek").oninput = (e) => { frame = Number(e.target.value); };
       $("modeAmt").onclick = () => setMode("amt");
       $("modePct").onclick = () => setMode("pct");
@@ -334,6 +361,8 @@ function start(d) {
       $("from").onchange = $("to").onchange = () => setRange($("from").value, $("to").value);
       document.addEventListener("keydown", (e) => {
         if (e.target.tagName === "INPUT" && e.target.type === "date") return;
+        if (e.code === "Escape") { hideFinal(); return; }
+        if (!$("final").classList.contains("hidden")) return;
         if (e.code === "Space") { e.preventDefault(); $("play").click(); }
         if (e.code === "ArrowRight") frame = Math.min(N - 1, Math.floor(frame) + 5);
         if (e.code === "ArrowLeft") frame = Math.max(0, Math.floor(frame) - 5);
@@ -377,7 +406,8 @@ function rebaseSlice(values, base) {
 
 function compose() {
   const dates = RAW.dates.slice(rLo, rHi + 1), base = RAW.initial;
-  const people = RAW.series.map((s, i) => ({ ...s, color: COLORS[i % COLORS.length], values: rebaseSlice(s.values, base) }));
+  const people = RAW.series.map((s, i) => ({ ...s, color: COLORS[i % COLORS.length], values: rebaseSlice(s.values, base),
+                                              label: s.team ? `${s.team} · ${s.label}` : s.label }));
   let series = people;
   if (view === "team") {
     const groups = new Map();
@@ -403,21 +433,71 @@ function compose() {
 function setView(v) {
   view = v;
   $("viewPerson").classList.toggle("on", v === "person"); $("viewTeam").classList.toggle("on", v === "team");
+  const keep = frame, wasPlaying = playing;
   start(compose());
+  frame = Math.min(keep, N - 1); $("seek").value = frame;
+  if (wasPlaying) setPlaying(true);
 }
+
+// ---------------------------------------------------------------- 최종 결과 (개인 순위 + 팀 순위)
+let finalShown = false;
+
+function curveStat(values, base) {
+  let peak = -Infinity, mdd = 0, last = null;
+  for (const v of values) {
+    if (v == null) continue;
+    last = v; if (v > peak) peak = v;
+    const dd = v / peak - 1; if (dd < mdd) mdd = dd;
+  }
+  return { final: last, ret: last == null ? null : last / base - 1, mdd };
+}
+
+function finalResults() {
+  const base = RAW.initial, dates = RAW.dates.slice(rLo, rHi + 1);
+  const people = RAW.series.map(s => ({ name: s.name, team: s.team || "", label: s.label || "", values: rebaseSlice(s.values, base) }));
+  const P = people.map(p => ({ ...p, ...curveStat(p.values, base) })).filter(p => p.final != null).sort((a, b) => b.final - a.final);
+  const groups = new Map();
+  for (const p of people) if (p.team) { if (!groups.has(p.team)) groups.set(p.team, []); groups.get(p.team).push(p); }
+  const T = [...groups.entries()].map(([team, ms]) => {
+    const avg = dates.map((_, k) => { const vs = ms.map(m => m.values[k]).filter(v => v != null); return vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : null; });
+    return { team, n: ms.length, members: ms.map(m => m.name).join(" · "), ...curveStat(avg, base) };
+  }).filter(t => t.final != null).sort((a, b) => b.final - a.final);
+  return { dates, P, T };
+}
+
+function showFinal() {
+  if (!RAW) return;
+  setPlaying(false);
+  const { dates, P, T } = finalResults();
+  $("finalSub").textContent = `${dates[0]} ~ ${dates[dates.length - 1]} · 시작 금액 ${fmtWon(RAW.initial)} · ${P.length}명` + (T.length ? ` · ${T.length}팀` : "");
+  const cls = (r) => r >= 0 ? "up" : "down";
+  $("finalPerson").innerHTML = `<thead><tr><th class="l">순위</th><th class="l">이름</th><th class="l">팀</th><th class="l">전략</th>
+    <th>최종 평가금액</th><th>수익률</th><th>최대 낙폭</th></tr></thead><tbody>` + P.map((p, i) => `<tr class="${i === 0 ? "win" : ""}">
+    <td class="l rk">${i + 1}</td><td class="l"><b>${esc(p.name)}</b></td><td class="l">${esc(p.team || "-")}</td><td class="l">${esc(p.label)}</td>
+    <td>${fmtWon(p.final)}</td><td class="${cls(p.ret)}"><b>${fmtPct(p.ret)}</b></td><td>${fmtPct(p.mdd)}</td></tr>`).join("") + "</tbody>";
+  $("finalTeamBox").classList.toggle("hidden", !T.length);
+  $("finalCols").classList.toggle("one", !T.length);
+  $("finalTeam").innerHTML = `<thead><tr><th class="l">순위</th><th class="l">팀</th><th>평균 평가금액</th><th>평균 수익률</th><th>최대 낙폭</th></tr></thead><tbody>` +
+    T.map((t, i) => `<tr class="${i === 0 ? "win" : ""}"><td class="l rk">${i + 1}</td>
+    <td class="l"><b>${esc(t.team)}</b><div class="mem">${esc(t.members)} (${t.n}명)</div></td>
+    <td>${fmtWon(t.final)}</td><td class="${cls(t.ret)}"><b>${fmtPct(t.ret)}</b></td><td>${fmtPct(t.mdd)}</td></tr>`).join("") + "</tbody>";
+  $("final").classList.remove("hidden");
+}
+
+function hideFinal() { $("final").classList.add("hidden"); }
 
 function setRange(from, to) {
   const ds = RAW.dates;
   let lo = ds.findIndex(d => d >= from), hi = -1;
   for (let i = ds.length - 1; i >= 0; i--) if (ds[i] <= to) { hi = i; break; }
   if (lo < 0 || hi < 0 || hi - lo < 1) { $("from").value = ds[rLo]; $("to").value = ds[rHi]; return; }
-  rLo = lo; rHi = hi;
+  rLo = lo; rHi = hi; finalShown = false;
   $("from").value = ds[rLo]; $("to").value = ds[rHi];
   start(compose());
 }
 
 function openRace(raw) {
-  RAW = raw; rLo = 0; rHi = RAW.dates.length - 1; view = "person";
+  RAW = raw; rLo = 0; rHi = RAW.dates.length - 1; view = "person"; finalShown = false;
   const hasTeam = RAW.series.some(s => s.team);
   $("viewBox").classList.toggle("hidden", !hasTeam);
   $("viewPerson").classList.add("on"); $("viewTeam").classList.remove("on");
@@ -468,14 +548,16 @@ function buildFromFiles(files) {
   if (!series.length) return { msgs };
   const lo = series.map(s => s.first).sort().pop(), hi = series.map(s => s.last).sort()[0];
   if (lo >= hi) { msgs.push(["bad", "파일들의 기간이 겹치지 않습니다."]); return { msgs }; }
-  if (series.some(s => s.first !== lo || s.last !== hi)) msgs.push(["ok", `기간이 서로 달라 겹치는 기간(${lo} ~ ${hi})으로 맞췄습니다.`]);
+  const cut = series.some(s => s.first !== lo || s.last !== hi);
   const dates = [...new Set(series.flatMap(s => [...s.map.keys()]))].filter(d => d >= lo && d <= hi).sort();
   const fill = (map) => { let prev = null; return dates.map(d => { if (map.has(d)) prev = map.get(d); return prev; }); };
-  // 시작 금액: CSV들의 첫날 평가금액 중 가장 많은 값 (보통 모두 같다)
+  // 시작 금액: 각 CSV 첫 줄(원래 시작일)의 평가금액 중 가장 많은 값 (보통 모두 1억 원)
   const count = new Map();
-  for (const s of series) { const k = Math.round(fill(s.map).find(v => v != null)); count.set(k, (count.get(k) || 0) + 1); }
+  for (const s of series) { const k = Math.round(s.start); count.set(k, (count.get(k) || 0) + 1); }
   const initial = [...count.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0][0];
-  if (count.size > 1) msgs.push(["ok", `시작 금액이 서로 달라 모두 ${initial.toLocaleString("ko-KR")}원에서 출발하도록 맞췄습니다 (수익률 흐름은 그대로).`]);
+  const won = initial.toLocaleString("ko-KR") + "원";
+  if (cut) msgs.push(["ok", `기간이 서로 달라 겹치는 기간(${lo} ~ ${hi})으로 맞추고, ${lo}에 모두 ${won}에서 다시 출발하게 했습니다 (수익률 흐름은 그대로).`]);
+  else if (count.size > 1) msgs.push(["ok", `시작 금액이 서로 달라 모두 ${won}에서 출발하도록 맞췄습니다 (수익률 흐름은 그대로).`]);
   const seen = {};
   const out = series.map(s => {
     seen[s.name] = (seen[s.name] || 0) + 1;
